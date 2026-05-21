@@ -24,10 +24,10 @@ INTERSECTIONS = {
 # ==============================================================================
 # !!! THAM SỐ THUẬT TOÁN !!!
 # ==============================================================================
-TOTAL_CYCLE_GREEN = 40.0
-GREEN_MIN = 12.0
-GREEN_MAX = 30.0
-LEFT_RATIO = 0.60
+TOTAL_CYCLE_GREEN = 20.0
+GREEN_MIN = 3.0
+GREEN_MAX = 15.0
+LEFT_RATIO = 0.40
 
 CAR_WEIGHT = 1.0
 BIKE_WEIGHT = 0.75
