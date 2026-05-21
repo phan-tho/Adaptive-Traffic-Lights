@@ -179,33 +179,33 @@ Server chỉ gửi khi thuật toán **quyết định thay đổi**. Không g�
         "i": 0,
         "s": {
             "c": "r",
-            "d": 1
+            "d": 10
         },
         "l": {
             "c": "r",
-            "d": 1
+            "d": 10
         }
     },
     {
         "i": 3,
         "s": {
             "c": "r",
-            "d": 1
+            "d": 2
         },
         "l": {
             "c": "r",
-            "d": 1
+            "d": 3
         }
     },
     {
         "i": 10,
         "s": {
             "c": "g",
-            "d": 1
+            "d": 3
         },
         "l": {
             "c": "g",
-            "d": 1
+            "d": 5
         }
     },
     {
@@ -216,12 +216,14 @@ Server chỉ gửi khi thuật toán **quyết định thay đổi**. Không g�
         },
         "l": {
             "c": "g",
-            "d": 1
+            "d": 3
         }
     }
   ]
 }
 ```
+Chú thích: "l" ở ngoài cùng là lanes, "i" là id, "s" là straight, "l" là left, "c" là color, "d" là duration.
+
 
 ## 6. Cấu Hình Kết Nối
 
