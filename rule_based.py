@@ -10,6 +10,7 @@ BROKER_IP = "3.107.18.217"
 BROKER_PORT = 1883
 TOPIC_TELEMETRY = "traffic/telemetry"
 TOPIC_LIGHTS = "traffic/lights"
+TOPIC_ESP32 = "traffic/lights/esp32"
 
 # ==============================================================================
 # !!! BỐ CỤC LÀN ĐƯỜNG CỦA 4 NGÃ TƯ !!!
@@ -53,6 +54,7 @@ intersection_states = {
 client = None
 last_sim_time = None
 last_telemetry_time = time.time()
+last_esp32_colors = {}
 
 # ==============================================================================
 # !!! HÀM GHI & ĐỌC FILE JSON PENDING VOLUMES !!!
@@ -247,6 +249,7 @@ def build_states(intersection_id, current_axis, phase_timer, phase_elapsed, t1_b
 # !!! HÀM GỬI LỆNH MQTT LÊN SIMULATOR !!!
 # ==============================================================================
 def publish_all_states():
+    global last_esp32_colors
     intersections_payload = []
     
     for iid, state in intersection_states.items():
@@ -260,6 +263,37 @@ def publish_all_states():
             state['lane_d1'],
             state['lane_d2']
         )
+        
+        # --- THÊM LOGIC ESP32 CHO NGÃ TƯ 0 ---
+        if iid == 0:
+            current_colors = {}
+            for lane_id, cmds in states.items():
+                current_colors[lane_id] = {
+                    's': cmds['straight']['state'][0], # 'r' hoặc 'g'
+                    'l': cmds['left']['state'][0]      # 'r' hoặc 'g'
+                }
+                
+            if current_colors != last_esp32_colors:
+                l_list = []
+                for lane_id, cmds in states.items():
+                    l_list.append({
+                        "i": lane_id,
+                        "s": {
+                            "c": cmds['straight']['state'][0],
+                            "d": cmds['straight']['duration']
+                        },
+                        "l": {
+                            "c": cmds['left']['state'][0],
+                            "d": cmds['left']['duration']
+                        }
+                    })
+                payload_esp32 = {"l": l_list}
+                try:
+                    client.publish(TOPIC_ESP32, json.dumps(payload_esp32))
+                except Exception as e:
+                    print(f"[MQTT ERROR] Lỗi không thể publish ESP32 ngã tư 0: {e}")
+                last_esp32_colors = current_colors
+        # ------------------------------------
         
         lanes_payload = []
         for lane_id, cmds in states.items():
