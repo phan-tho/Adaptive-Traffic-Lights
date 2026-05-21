@@ -14,6 +14,7 @@
                     │  JSON (điều khiển đèn)
                     ▼
             [Simulator: cập nhật đèn theo lệnh]
+        [ESP32: điều khiển đèn thật ở sa hình thực tế]
 ```
 
 **Tất cả giao tiếp dùng JSON qua MQTT.**
@@ -160,7 +161,69 @@ Lệnh có hiệu lực **ngay khi Simulator nhận được**.
 - **Hết thời gian đếm ngược (Không có tín hiệu điều khiển mới)**: Nếu thời gian (`duration`) đếm ngược về 0 mà Simulator chưa nhận được lệnh điều khiển mới từ Server, hệ thống sẽ tự động luân phiên trạng thái (giống hệ thống đèn cố định): Đèn đang `red` (đỏ) sẽ tự động chuyển sang `green` (xanh) với thời gian 20 giây; Đèn đang `green` hoặc `yellow` sẽ tự động chuyển sang `red` (đỏ) với thời gian 20 giây. Điều này đảm bảo giao thông vẫn hoạt động bình thường kể cả khi mất kết nối.
 - **Lưu ý**: Simulator đóng vai trò lắng nghe. Server phải gửi lệnh mới trước khi đèn xanh/vàng hiện tại đếm ngược về 0 nếu không muốn bị ngắt quãng luồng giao thông.
 
-## 5. Cấu Hình Kết Nối
+## 5. Server → ESP32: Điều Khiển Đèn Sa hình thực tế
+ESP32 giả lập 8 đèn ở ngã tư số 0
+### Endpoint (ESP32 lắng nghe)
+```
+TOPIC: traffic/lights/esp32
+```
+
+Server chỉ gửi khi thuật toán **quyết định thay đổi**. Không gửi định kỳ nếu không có thay đổi.
+
+### Payload
+
+```json
+{
+  "l": [
+    {
+        "i": 0,
+        "s": {
+            "c": "r",
+            "d": 1
+        },
+        "l": {
+            "c": "r",
+            "d": 1
+        }
+    },
+    {
+        "i": 3,
+        "s": {
+            "c": "r",
+            "d": 1
+        },
+        "l": {
+            "c": "r",
+            "d": 1
+        }
+    },
+    {
+        "i": 10,
+        "s": {
+            "c": "g",
+            "d": 1
+        },
+        "l": {
+            "c": "g",
+            "d": 1
+        }
+    },
+    {
+        "i": 9,
+        "s": {
+            "c": "g",
+            "d": 1
+        },
+        "l": {
+            "c": "g",
+            "d": 1
+        }
+    }
+  ]
+}
+```
+
+## 6. Cấu Hình Kết Nối
 
 **Broker MQTT:**
 ```
@@ -168,7 +231,7 @@ IP=3.107.18.217
 PORT=1883
 ```
 
-## 6. Pipeline
+## 7. Pipeline
 Khi chạy phần mềm giả lập, màn hình hiện lên giả lập 4 ngã tư. Tôi dùng camera pi5 để quay màn hình giả lập. pi5 gửi số lượng xe mỗi làn lên server. Server có thuật toán chạy và gửi json điều khiển đèn. Sau đó giả lập lắng nghe tín hiệu điều khiển để điều chỉnh đèn đỏ
 
 <!-- ## 6. Thứ Tự Khởi Động
