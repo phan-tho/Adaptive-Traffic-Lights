@@ -43,7 +43,9 @@ intersection_states = {
         'phase_elapsed': 0.0,
         'phase_timer': 0.0,
         't1_boundary': 0.0,
-        't2_boundary': 0.0
+        't2_boundary': 0.0,
+        'lane_d1': None,
+        'lane_d2': None
     }
     for iid in INTERSECTIONS.keys()
 }
@@ -112,20 +114,35 @@ def calculate_new_phase(intersection_id, current_axis):
     """
     loaded = save_and_load_volumes(intersection_id, current_axis)
     
+    lane1_id = loaded["lane1"]["id"]
+    lane2_id = loaded["lane2"]["id"]
+    
     V1 = loaded["lane1"]["cars"] * CAR_WEIGHT + loaded["lane1"]["bikes"] * BIKE_WEIGHT
     V2 = loaded["lane2"]["cars"] * CAR_WEIGHT + loaded["lane2"]["bikes"] * BIKE_WEIGHT
     V_active = V1 + V2
     
+    # Làn nào đông xe hơn sẽ chạy trước (lane_d1)
+    if V1 >= V2:
+        lane_d1 = lane1_id
+        lane_d2 = lane2_id
+        V_d1 = V1
+        V_d2 = V2
+    else:
+        lane_d1 = lane2_id
+        lane_d2 = lane1_id
+        V_d1 = V2
+        V_d2 = V1
+        
     other_axis = 'WE' if current_axis == 'NS' else 'NS'
     lanes = INTERSECTIONS[intersection_id]
     
     if other_axis == 'NS':
-        lane1_id, lane2_id = lanes['N'], lanes['S']
+        lane_other1_id, lane_other2_id = lanes['N'], lanes['S']
     else:
-        lane1_id, lane2_id = lanes['E'], lanes['W']
+        lane_other1_id, lane_other2_id = lanes['E'], lanes['W']
         
-    l1 = latest_counts[lane1_id]
-    l2 = latest_counts[lane2_id]
+    l1 = latest_counts[lane_other1_id]
+    l2 = latest_counts[lane_other2_id]
     
     c1, b1 = (1, 2) if l1["cars"] == 0 and l1["bikes"] == 0 else (l1["cars"], l1["bikes"])
     c2, b2 = (1, 2) if l2["cars"] == 0 and l2["bikes"] == 0 else (l2["cars"], l2["bikes"])
@@ -143,8 +160,8 @@ def calculate_new_phase(intersection_id, current_axis):
     MIN_STAGE = 4.0
     remaining_pool = max(0.0, T - 3.0 * MIN_STAGE)
     
-    share1 = left_time * (V1 / (V1 + V2)) if (V1 + V2) > 0 else left_time / 2.0
-    share3 = left_time * (V2 / (V1 + V2)) if (V1 + V2) > 0 else left_time / 2.0
+    share1 = left_time * (V_d1 / (V_d1 + V_d2)) if (V_d1 + V_d2) > 0 else left_time / 2.0
+    share3 = left_time * (V_d2 / (V_d1 + V_d2)) if (V_d1 + V_d2) > 0 else left_time / 2.0
     share2 = T - (share1 + share3)
     
     share1 = max(0.0, share1)
@@ -165,14 +182,15 @@ def calculate_new_phase(intersection_id, current_axis):
     t2_boundary = d1_duration + d2_duration
     
     print(f"\n[THAY ĐỔI PHA] Ngã tư {intersection_id} | Trục {current_axis} lên XANH")
+    print(f" -> Làn đông xe hơn (D1): {lane_d1} (V={V_d1:.1f}) | Làn ít xe hơn (D2): {lane_d2} (V={V_d2:.1f})")
     print(f" -> Lượng xe xanh: {V_active:.1f} | đỏ: {V_inactive:.1f} | T: {T:.1f}s | S1: {d1_duration:.1f}s | S2: {d2_duration:.1f}s | S3: {d3_duration:.1f}s")
     
-    return t1_boundary, t2_boundary, T
+    return t1_boundary, t2_boundary, T, lane_d1, lane_d2
 
 # ==============================================================================
 # !!! THIẾT LẬP TRẠNG THÁI ĐÈN CHO MỖI GIÂY TRONG CHU KỲ !!!
 # ==============================================================================
-def build_states(intersection_id, current_axis, phase_timer, phase_elapsed, t1_boundary, t2_boundary):
+def build_states(intersection_id, current_axis, phase_timer, phase_elapsed, t1_boundary, t2_boundary, lane_d1, lane_d2):
     remaining = max(0.1, phase_timer - phase_elapsed)
     remaining_int = max(1, int(remaining))
     
@@ -184,13 +202,6 @@ def build_states(intersection_id, current_axis, phase_timer, phase_elapsed, t1_b
             "straight": {"state": "red", "duration": remaining_int + 5},
             "left":     {"state": "red", "duration": remaining_int + 5}
         }
-        
-    if current_axis == 'NS':
-        lane_d1 = lanes['N']
-        lane_d2 = lanes['S']
-    else:
-        lane_d1 = lanes['E']
-        lane_d2 = lanes['W']
         
     t = phase_elapsed
     t1 = t1_boundary
@@ -245,7 +256,9 @@ def publish_all_states():
             state['phase_timer'], 
             state['phase_elapsed'], 
             state['t1_boundary'], 
-            state['t2_boundary']
+            state['t2_boundary'],
+            state['lane_d1'],
+            state['lane_d2']
         )
         
         lanes_payload = []
@@ -333,10 +346,12 @@ def main():
     
     print("[INFO] Khởi tạo pha ban đầu cho 4 ngã tư...")
     for iid in INTERSECTIONS.keys():
-        t1, t2, T = calculate_new_phase(iid, intersection_states[iid]['current_axis'])
+        t1, t2, T, lane_d1, lane_d2 = calculate_new_phase(iid, intersection_states[iid]['current_axis'])
         intersection_states[iid]['phase_timer'] = T
         intersection_states[iid]['t1_boundary'] = t1
         intersection_states[iid]['t2_boundary'] = t2
+        intersection_states[iid]['lane_d1'] = lane_d1
+        intersection_states[iid]['lane_d2'] = lane_d2
         
     last_loop_time = time.time()
     print("\n[INFO] Đang chạy vòng lặp chính của hệ thống...")
@@ -374,11 +389,13 @@ def main():
             for iid, state in intersection_states.items():
                 if state['phase_elapsed'] >= state['phase_timer'] - 0.05:
                     next_axis = 'WE' if state['current_axis'] == 'NS' else 'NS'
-                    t1, t2, T = calculate_new_phase(iid, next_axis)
+                    t1, t2, T, lane_d1, lane_d2 = calculate_new_phase(iid, next_axis)
                     state['current_axis'] = next_axis
                     state['phase_timer'] = T
                     state['t1_boundary'] = t1
                     state['t2_boundary'] = t2
+                    state['lane_d1'] = lane_d1
+                    state['lane_d2'] = lane_d2
                     state['phase_elapsed'] = 0.0
                     
     except KeyboardInterrupt:
